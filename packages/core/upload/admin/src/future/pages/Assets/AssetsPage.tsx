@@ -21,6 +21,8 @@ import { useIntl } from 'react-intl';
 import { styled } from 'styled-components';
 
 import { usePersistentState } from '../../../hooks/usePersistentState';
+import { useTypedDispatch } from '../../store/hooks';
+import { openUploadProgress, closeUploadProgress } from '../../store/uploadProgress';
 import { useUploadFilesMutation } from '../../services/api';
 import { useGetAssetsQuery } from '../../services/assets';
 import { getTranslationKey } from '../../utils/translations';
@@ -107,6 +109,7 @@ export const AssetsPage = () => {
   // Upload hooks
   const { toggleNotification } = useNotification();
   const { _unstableFormatAPIError } = useAPIErrorHandler();
+  const dispatch = useTypedDispatch();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadFiles] = useUploadFilesMutation();
 
@@ -139,22 +142,17 @@ export const AssetsPage = () => {
         );
       });
 
+      // Open the upload progress dialog with file count
+      dispatch(openUploadProgress({ totalFiles: filesArray.length }));
+
       try {
         // unwrap() is needed to throw errors and trigger the catch block
         // Without it, RTK Query never rejects and catch would never execute
-        await uploadFiles(formData).unwrap();
-        toggleNotification({
-          type: 'success',
-          message: formatMessage(
-            {
-              id: getTranslationKey('assets.uploaded'),
-              defaultMessage:
-                '{number, plural, one {# asset} other {# assets}} uploaded successfully',
-            },
-            { number: filesArray.length }
-          ),
-        });
+        await uploadFiles({ formData }).unwrap();
       } catch (error) {
+        // Close dialog on error
+        dispatch(closeUploadProgress());
+
         // Format the error message using the API error handler to provide
         // context-specific feedback (e.g., file size limits, format restrictions, network errors)
         const errorMessage = _unstableFormatAPIError(error as Error);

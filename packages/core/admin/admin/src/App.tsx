@@ -30,10 +30,24 @@ const App = ({ strapi, store }: AppProps) => {
     }
   }, []);
 
+  /**
+   * @internal
+   * @experimnental
+   *
+   * The `future-global::` namespace is intended for internal use.
+   * It is experimental and could change or be removed in the future.
+   */
+  const globalComponents = Object.entries(strapi.library.components)
+    .filter(([name]) => name.startsWith('future-global::'))
+    .map(([name, Component]) => ({ name, Component }));
+
   return (
     <Providers strapi={strapi} store={store}>
       <Suspense fallback={<Page.Loading />}>
         <GlobalNotifications />
+        {globalComponents.map(({ name, Component }) => (
+          <Component key={name} />
+        ))}
         <Outlet />
       </Suspense>
     </Providers>
