@@ -42,6 +42,14 @@ export const routes = {
       },
     },
     {
+      method: 'POST',
+      path: '/batch',
+      handler: 'admin-upload.uploadFilesBatch',
+      config: {
+        policies: ['admin::isAuthenticatedAdmin'],
+      },
+    },
+    {
       method: 'GET',
       path: '/files',
       handler: 'admin-file.find',

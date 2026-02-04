@@ -16,10 +16,10 @@ import { useIntl } from 'react-intl';
 import { styled } from 'styled-components';
 
 import { usePersistentState } from '../../../hooks/usePersistentState';
-import { useUploadFilesMutation } from '../../services/api';
+import { useUploadFilesBatchMutation } from '../../services/api';
 import { useGetAssetsQuery } from '../../services/assets';
 import { useTypedDispatch } from '../../store/hooks';
-import { openUploadProgress, incrementFileIndex } from '../../store/uploadProgress';
+import { openUploadProgress } from '../../store/uploadProgress';
 import { getTranslationKey } from '../../utils/translations';
 
 import { AssetsGrid } from './components/AssetsGrid';
@@ -112,7 +112,7 @@ export const AssetsPage = () => {
   // Upload hooks
   const dispatch = useTypedDispatch();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadFiles] = useUploadFilesMutation();
+  const [uploadFilesBatch] = useUploadFilesBatchMutation();
 
   // View state
   const [view, setView] = usePersistentState(localStorageKeys.view, viewOptions.GRID);
@@ -131,32 +131,32 @@ export const AssetsPage = () => {
       // Open the upload progress dialog with file count
       dispatch(openUploadProgress({ totalFiles: filesArray.length }));
 
-      // Upload files individually to track errors per file
+      // Build single FormData with all files
+      const formData = new FormData();
+      const fileInfoArray: Array<{
+        name: string;
+        caption: null;
+        alternativeText: null;
+        folder: null;
+      }> = [];
+
       for (const file of filesArray) {
-        const formData = new FormData();
-
         formData.append('files', file);
-        formData.append(
-          'fileInfo',
-          JSON.stringify({
-            name: file.name,
-            caption: null,
-            alternativeText: null,
-            folder: null,
-          })
-        );
+        fileInfoArray.push({
+          name: file.name,
+          caption: null,
+          alternativeText: null,
+          folder: null,
+        });
+      }
+      formData.append('fileInfo', JSON.stringify(fileInfoArray));
 
-        try {
-          // unwrap() is needed to throw errors and trigger the catch block
-          // Without it, RTK Query never rejects and catch would never execute
-          await uploadFiles({ formData }).unwrap();
-        } catch {
-          // Error is already dispatched to store from the API queryFn
-          // Continue uploading remaining files
-        }
-
-        // Move to next file
-        dispatch(incrementFileIndex());
+      try {
+        // Single request for all files
+        // Errors are dispatched to store from the API queryFn
+        await uploadFilesBatch({ formData }).unwrap();
+      } catch {
+        // Error is already dispatched to store from the API queryFn
       }
     }
     // Reset input so the same file can be selected again

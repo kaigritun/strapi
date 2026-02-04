@@ -215,6 +215,7 @@ export declare namespace DeleteFile {
 
 /**
  * POST /upload - Create a file
+ * @deprecated Use CreateFilesBatch instead
  */
 export declare namespace CreateFile {
   export interface Request {
@@ -224,6 +225,23 @@ export declare namespace CreateFile {
   export interface Response {
     data: File[];
     error?: errors.ApplicationError | errors.ValidationError;
+  }
+}
+
+/**
+ * POST /upload/batch - Batch upload files with partial success support
+ */
+export declare namespace CreateFilesBatch {
+  export interface FileUploadError {
+    name: string;
+    message: string;
+  }
+  export interface Request {
+    body: FormData;
+  }
+  export interface Response {
+    data: File[];
+    errors?: FileUploadError[];
   }
 }
 

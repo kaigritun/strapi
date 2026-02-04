@@ -2,7 +2,7 @@ import { adminApi } from '@strapi/admin/strapi-admin';
 
 import { updateProgress, addUploadErrors } from '../store/uploadProgress';
 
-import type { CreateFile } from '../../../../shared/contracts/files';
+import type { CreateFilesBatch } from '../../../../shared/contracts/files';
 
 interface UploadFilesArgs {
   formData: FormData;
@@ -20,7 +20,11 @@ const uploadApi = adminApi
   })
   .injectEndpoints({
     endpoints: (builder) => ({
-      uploadFiles: builder.mutation<CreateFile.Response, UploadFilesArgs>({
+      /**
+       * Batch upload files to the new /upload/batch endpoint.
+       * Returns { data: File[], errors?: FileUploadError[] }
+       */
+      uploadFilesBatch: builder.mutation<CreateFilesBatch.Response, UploadFilesArgs>({
         queryFn: async ({ formData }, { signal, dispatch, getState }) => {
           const token = (getState() as RootState).admin_app?.token;
 
@@ -35,53 +39,26 @@ const uploadApi = adminApi
             });
 
             xhr.addEventListener('load', () => {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                  const response = JSON.parse(xhr.responseText);
+              try {
+                const response: CreateFilesBatch.Response = JSON.parse(xhr.responseText);
+
+                // Dispatch errors if any files failed
+                if (response.errors && response.errors.length > 0) {
+                  dispatch(addUploadErrors(response.errors));
+                }
+
+                // Resolve for both full success (201) and partial success (400 with some data)
+                // This ensures cache invalidation triggers even with partial failures
+                if (response.data && response.data.length > 0) {
                   resolve({ data: response });
-                } catch (error) {
-                  reject({ error: { status: 'PARSING_ERROR', error: 'Failed to parse response' } });
+                } else {
+                  // Complete failure - no files uploaded
+                  reject({ error: { status: xhr.status, data: response } });
                 }
-              } else {
-                try {
-                  const errorResponse = JSON.parse(xhr.responseText);
-
-                  // Dispatch error to store immediately since RTK Query strips complex error objects
-                  const fileErrors = [];
-
-                  // Check for batch validation errors (multiple files)
-                  if (
-                    errorResponse.error?.details?.errors &&
-                    Array.isArray(errorResponse.error.details.errors)
-                  ) {
-                    // Batch upload with multiple errors
-                    for (const err of errorResponse.error.details.errors) {
-                      if (err.name && err.message) {
-                        fileErrors.push({
-                          name: err.name,
-                          message: err.message,
-                        });
-                      }
-                    }
-                  }
-                  // Check for single file error
-                  else if (errorResponse.error?.details?.fileName && errorResponse.error?.message) {
-                    fileErrors.push({
-                      name: errorResponse.error.details.fileName,
-                      message: errorResponse.error.message,
-                    });
-                  }
-
-                  if (fileErrors.length > 0) {
-                    dispatch(addUploadErrors(fileErrors));
-                  }
-
-                  reject({ error: { status: xhr.status, data: errorResponse } });
-                } catch {
-                  reject({
-                    error: { status: xhr.status, error: `Upload failed with status ${xhr.status}` },
-                  });
-                }
+              } catch {
+                reject({
+                  error: { status: 'PARSING_ERROR', error: 'Failed to parse response' },
+                });
               }
             });
 
@@ -100,7 +77,7 @@ const uploadApi = adminApi
             }
 
             const backendURL = window.strapi.backendURL;
-            xhr.open('POST', `${backendURL}/upload`);
+            xhr.open('POST', `${backendURL}/upload/batch`);
 
             if (token) {
               xhr.setRequestHeader('Authorization', `Bearer ${token}`);
@@ -109,10 +86,10 @@ const uploadApi = adminApi
             xhr.send(formData);
           });
         },
-        invalidatesTags: ['Asset'],
+        invalidatesTags: [{ type: 'Asset', id: 'LIST' }],
       }),
     }),
   });
 
-export const { useUploadFilesMutation } = uploadApi;
+export const { useUploadFilesBatchMutation } = uploadApi;
 export { uploadApi };

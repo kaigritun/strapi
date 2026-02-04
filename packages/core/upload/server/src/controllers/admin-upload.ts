@@ -8,7 +8,7 @@ import { ACTIONS, FILE_MODEL_UID } from '../constants';
 import { validateBulkUpdateBody, validateUploadBody } from './validation/admin/upload';
 import { findEntityAndCheckPermissions } from './utils/find-entity-and-check-permissions';
 import { FileInfo } from '../types';
-import { prepareUploadRequest } from '../utils/mime-validation';
+import { prepareUploadRequest, type FileUploadError } from '../utils/mime-validation';
 
 export default {
   async bulkUpdateFileInfo(ctx: Context) {
@@ -98,7 +98,14 @@ export default {
     ctx.body = await pm.sanitizeOutput(signedFile, { action: ACTIONS.read });
   },
 
+  /**
+   * @deprecated Use uploadFilesBatch instead. This endpoint will be removed in a future version.
+   */
   async uploadFiles(ctx: Context) {
+    strapi.log.warn(
+      'POST /upload is deprecated for multi-file uploads. Use POST /upload/batch instead.'
+    );
+
     const {
       state: { userAbility, user },
       request: { body, files: { files } = {} },
@@ -163,6 +170,121 @@ export default {
 
     ctx.body = await pm.sanitizeOutput(signedFiles, { action: ACTIONS.read });
     ctx.status = 201;
+  },
+
+  /**
+   * Batch upload files with proper { data, errors } response shape.
+   * Implements per-file partial success - each file is uploaded individually.
+   */
+  async uploadFilesBatch(ctx: Context) {
+    const {
+      state: { userAbility, user },
+      request: { body, files: { files } = {} },
+    } = ctx;
+
+    const uploadService = getService('upload');
+    const pm = strapi.service('admin::permission').createPermissionsManager({
+      ability: userAbility,
+      action: ACTIONS.create,
+      model: FILE_MODEL_UID,
+    });
+
+    if (!pm.isAllowed) {
+      return ctx.forbidden();
+    }
+
+    if (_.isEmpty(files) || (!Array.isArray(files) && files.size === 0)) {
+      throw new errors.ApplicationError('Files are empty');
+    }
+
+    // Get validation errors from prepareUploadRequest
+    const {
+      validFiles,
+      filteredBody,
+      errors: validationErrors,
+    } = await prepareUploadRequest(files, body, strapi);
+
+    const uploadErrors: FileUploadError[] = [...validationErrors];
+    const successfulFiles: any[] = [];
+
+    // Parse fileInfo to align with files
+    let parsedFileInfo: any[] = [];
+    if (filteredBody?.fileInfo) {
+      parsedFileInfo = Array.isArray(filteredBody.fileInfo)
+        ? filteredBody.fileInfo
+        : [filteredBody.fileInfo];
+    }
+
+    // Track uploaded files before signing (needed for AI metadata)
+    const uploadedFiles: any[] = [];
+
+    // Controlled concurrency to prevent OOM on bulk uploads
+    const CONCURRENCY_LIMIT = 2;
+
+    // Prepare upload tasks with their fileInfo
+    const uploadTasks = validFiles.map((file, index) => ({
+      file,
+      fileInfo: parsedFileInfo[index] || {
+        name: file.originalFilename,
+        caption: null,
+        alternativeText: null,
+        folder: null,
+      },
+    }));
+
+    // Process files in batches with controlled concurrency
+    for (let i = 0; i < uploadTasks.length; i += CONCURRENCY_LIMIT) {
+      const batch = uploadTasks.slice(i, i + CONCURRENCY_LIMIT);
+
+      const results = await Promise.allSettled(
+        batch.map(async ({ file, fileInfo }) => {
+          const data = await validateUploadBody({ fileInfo }, false);
+          const [uploadedFile] = await uploadService.upload({ data, files: [file] }, { user });
+
+          // Sign file url
+          const signedFile = await getService('file').signFileUrls(uploadedFile);
+          return { uploadedFile, signedFile };
+        })
+      );
+
+      // Collect successes and failures from this batch
+      for (const [idx, result] of results.entries()) {
+        if (result.status === 'fulfilled') {
+          uploadedFiles.push(result.value.uploadedFile);
+          successfulFiles.push(result.value.signedFile);
+        } else {
+          const file = batch[idx].file;
+          uploadErrors.push({
+            name: file.originalFilename || 'unknown',
+            message: result.reason instanceof Error ? result.reason.message : String(result.reason),
+          });
+        }
+      }
+    }
+
+    // Track image upload metric once if any images were uploaded
+    if (uploadedFiles.some((file) => file.mime?.startsWith('image/'))) {
+      await getService('metrics').trackUsage('didUploadImage');
+    }
+
+    // Generate AI metadata for all successful uploads (outside loop to avoid rate limiting)
+    const aiMetadataService = getService('aiMetadata');
+    if (uploadedFiles.length > 0 && (await aiMetadataService.isEnabled())) {
+      try {
+        const metadataResults = await aiMetadataService.processFiles(uploadedFiles);
+        await aiMetadataService.updateFilesWithAIMetadata(uploadedFiles, metadataResults, user);
+      } catch (error) {
+        strapi.log.warn('AI metadata generation failed, proceeding without AI enhancements', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    ctx.body = {
+      data: await pm.sanitizeOutput(successfulFiles, { action: ACTIONS.read }),
+      errors: uploadErrors,
+    };
+    ctx.status = uploadErrors.length > 0 ? 400 : 201;
   },
 
   // TODO: split into multiple endpoints

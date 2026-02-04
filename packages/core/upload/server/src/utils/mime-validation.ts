@@ -292,9 +292,15 @@ export async function enforceUploadSecurity(
   return { validFiles, validFileNames, errors };
 }
 
+export type FileUploadError = {
+  name: string;
+  message: string;
+};
+
 export type PrepareUploadResult = {
   validFiles: any[];
   filteredBody: any;
+  errors: FileUploadError[];
 };
 
 /**
@@ -352,8 +358,15 @@ export async function prepareUploadRequest(
     }
   }
 
+  // Map errors to simplified format
+  const uploadErrors: FileUploadError[] = securityResults.errors.map((e) => ({
+    name: e.file?.originalFilename || e.file?.name || 'unknown',
+    message: e.error.message,
+  }));
+
   return {
     validFiles: securityResults.validFiles,
     filteredBody,
+    errors: uploadErrors,
   };
 }
