@@ -1,12 +1,7 @@
 import { useRef, type ChangeEvent } from 'react';
 
 import * as ToggleGroup from '@radix-ui/react-toggle-group';
-import {
-  Layouts,
-  SearchInput,
-  useNotification,
-  useAPIErrorHandler,
-} from '@strapi/admin/strapi-admin';
+import { Layouts, SearchInput } from '@strapi/admin/strapi-admin';
 import {
   Box,
   Flex,
@@ -21,15 +16,19 @@ import { useIntl } from 'react-intl';
 import { styled } from 'styled-components';
 
 import { usePersistentState } from '../../../hooks/usePersistentState';
-import { useTypedDispatch } from '../../store/hooks';
-import { openUploadProgress, closeUploadProgress } from '../../store/uploadProgress';
 import { useUploadFilesMutation } from '../../services/api';
 import { useGetAssetsQuery } from '../../services/assets';
+import { useTypedDispatch } from '../../store/hooks';
+import { openUploadProgress, incrementFileIndex } from '../../store/uploadProgress';
 import { getTranslationKey } from '../../utils/translations';
 
 import { AssetsGrid } from './components/AssetsGrid';
 import { AssetsList } from './components/AssetsList';
 import { localStorageKeys, viewOptions } from './constants';
+
+/* -------------------------------------------------------------------------------------------------
+ * AssetsView
+ * -----------------------------------------------------------------------------------------------*/
 
 interface AssetsViewProps {
   view: number;
@@ -70,6 +69,10 @@ const AssetsView = ({ view }: AssetsViewProps) => {
   return <AssetsList assets={assets} />;
 };
 
+/* -------------------------------------------------------------------------------------------------
+ * AssetsPage
+ * -----------------------------------------------------------------------------------------------*/
+
 const StyledToggleGroup = styled(ToggleGroup.Root)`
   display: flex;
   border: 1px solid ${({ theme }) => theme.colors.neutral200};
@@ -107,8 +110,6 @@ export const AssetsPage = () => {
   const { formatMessage } = useIntl();
 
   // Upload hooks
-  const { toggleNotification } = useNotification();
-  const { _unstableFormatAPIError } = useAPIErrorHandler();
   const dispatch = useTypedDispatch();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadFiles] = useUploadFilesMutation();
@@ -125,11 +126,15 @@ export const AssetsPage = () => {
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      const formData = new FormData();
       const filesArray = Array.from(files);
 
-      // Add files and fileInfo to the form data
-      filesArray.forEach((file) => {
+      // Open the upload progress dialog with file count
+      dispatch(openUploadProgress({ totalFiles: filesArray.length }));
+
+      // Upload files individually to track errors per file
+      for (const file of filesArray) {
+        const formData = new FormData();
+
         formData.append('files', file);
         formData.append(
           'fileInfo',
@@ -140,26 +145,18 @@ export const AssetsPage = () => {
             folder: null,
           })
         );
-      });
 
-      // Open the upload progress dialog with file count
-      dispatch(openUploadProgress({ totalFiles: filesArray.length }));
+        try {
+          // unwrap() is needed to throw errors and trigger the catch block
+          // Without it, RTK Query never rejects and catch would never execute
+          await uploadFiles({ formData }).unwrap();
+        } catch {
+          // Error is already dispatched to store from the API queryFn
+          // Continue uploading remaining files
+        }
 
-      try {
-        // unwrap() is needed to throw errors and trigger the catch block
-        // Without it, RTK Query never rejects and catch would never execute
-        await uploadFiles({ formData }).unwrap();
-      } catch (error) {
-        // Close dialog on error
-        dispatch(closeUploadProgress());
-
-        // Format the error message using the API error handler to provide
-        // context-specific feedback (e.g., file size limits, format restrictions, network errors)
-        const errorMessage = _unstableFormatAPIError(error as Error);
-        toggleNotification({
-          type: 'danger',
-          message: errorMessage,
-        });
+        // Move to next file
+        dispatch(incrementFileIndex());
       }
     }
     // Reset input so the same file can be selected again

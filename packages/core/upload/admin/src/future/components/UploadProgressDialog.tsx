@@ -1,6 +1,14 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { Box, Flex, IconButton, ProgressBar, Typography } from '@strapi/design-system';
-import { Cross, Minus, Plus, Upload } from '@strapi/icons';
+import {
+  Badge,
+  Box,
+  Button,
+  Flex,
+  IconButton,
+  ProgressBar,
+  Typography,
+} from '@strapi/design-system';
+import { CheckCircle, Cross, Minus, Plus, Upload, WarningCircle } from '@strapi/icons';
 import { useIntl } from 'react-intl';
 import { styled } from 'styled-components';
 
@@ -20,10 +28,10 @@ const StyleDialogHeader = styled(Flex)`
   border-bottom: 1px solid ${({ theme }) => theme.colors.neutral150};
 `;
 
-const DialogHeader = ({ totalFiles }: { totalFiles: number }) => {
+const DialogHeader = () => {
   const { formatMessage } = useIntl();
   const dispatch = useTypedDispatch();
-  const { isMinimized } = useTypedSelector((state) => state.uploadProgress);
+  const { isMinimized, totalFiles } = useTypedSelector((state) => state.uploadProgress);
 
   const handleToggleMinimize = () => {
     dispatch(toggleMinimize());
@@ -110,19 +118,44 @@ const DialogProgressBar = styled(ProgressBar)`
   }
 `;
 
+const ErrorList = styled(Flex)`
+  gap: ${({ theme }) => theme.spaces[2]};
+  flex-direction: column;
+`;
+
+const ErrorRow = styled(Flex)`
+  gap: ${({ theme }) => theme.spaces[4]};
+  justify-content: space-between;
+`;
+
+const DialogFooter = styled(Flex)`
+  padding: ${({ theme }) => theme.spaces[2]};
+  justify-content: flex-end;
+  align-items: center;
+  border-top: 1px solid ${({ theme }) => theme.colors.neutral150};
+`;
+
 export const UploadProgressDialog = () => {
   const { formatMessage } = useIntl();
 
-  const { isOpen, isMinimized, progress, totalFiles } = useTypedSelector(
+  const dispatch = useTypedDispatch();
+  const { isOpen, isMinimized, progress, errors } = useTypedSelector(
     (state) => state.uploadProgress
   );
+
+  const hasErrors = errors.length > 0;
+  const isComplete = progress === 100;
+
+  const handleClose = () => {
+    dispatch(closeUploadProgress());
+  };
 
   if (isMinimized) {
     return (
       <Dialog.Root open={isOpen} modal={false}>
         <Dialog.Portal>
           <DialogContentMinimized>
-            <DialogHeader totalFiles={totalFiles} />
+            <DialogHeader />
           </DialogContentMinimized>
         </Dialog.Portal>
       </Dialog.Root>
@@ -133,23 +166,85 @@ export const UploadProgressDialog = () => {
     <Dialog.Root open={isOpen} modal={false}>
       <Dialog.Portal>
         <DialogContent>
-          <DialogHeader totalFiles={totalFiles} />
+          {/* Header */}
+          <DialogHeader />
 
+          {/* Content */}
           <Box paddingTop={4} paddingBottom={4} paddingLeft={6} paddingRight={6}>
-            <Flex direction="column" alignItems="stretch" gap={2}>
-              <Flex gap={2}>
-                <Upload fill="neutral500" />
-                <Typography variant="pi">
-                  {formatMessage({
-                    id: getTranslationKey('upload.progress.label'),
-                    defaultMessage: 'Upload',
-                  })}
-                </Typography>
+            <Flex direction="column" alignItems="stretch" gap={4}>
+              <Flex direction="column" alignItems="stretch" gap={2}>
+                <Flex gap={2} alignItems="center" justifyContent="space-between">
+                  <Flex gap={2} alignItems="center">
+                    {isComplete ? <CheckCircle fill="success600" /> : <Upload fill="neutral500" />}
+                    <Flex>
+                      <Typography variant="pi">
+                        {formatMessage({
+                          id: getTranslationKey('upload.progress.label'),
+                          defaultMessage: 'Upload',
+                        })}
+                      </Typography>
+                      {!isComplete && (
+                        <Typography variant="pi" textColor="netural600">
+                          {progress}%
+                        </Typography>
+                      )}
+                    </Flex>
+                  </Flex>
+                  {hasErrors && (
+                    <Badge
+                      backgroundColor="warning100"
+                      textColor="warning600"
+                      size="S"
+                      borderColor="warning200"
+                    >
+                      <Flex alignItems="center" gap="2px">
+                        <WarningCircle width={12} height={12} />
+                        {errors.length}
+                      </Flex>
+                    </Badge>
+                  )}
+                </Flex>
+
+                <DialogProgressBar value={progress} />
               </Flex>
 
-              <DialogProgressBar value={progress} />
+              {hasErrors && (
+                <Flex direction="column" alignItems="flex-start" gap={2}>
+                  <Typography variant="omega" fontWeight="bold">
+                    {formatMessage({
+                      id: getTranslationKey('upload.progress.errors.title'),
+                      defaultMessage: 'Failed to upload:',
+                    })}
+                  </Typography>
+
+                  <ErrorList>
+                    {errors.map((error, index) => (
+                      <ErrorRow key={index}>
+                        <Typography variant="pi" textColor="danger600">
+                          {error.name}
+                        </Typography>
+                        <Typography variant="pi" textColor="danger600">
+                          {error.message}
+                        </Typography>
+                      </ErrorRow>
+                    ))}
+                  </ErrorList>
+                </Flex>
+              )}
             </Flex>
           </Box>
+
+          {/* Footer */}
+          {!isComplete && (
+            <DialogFooter>
+              <Button onClick={handleClose} variant="danger-light">
+                {formatMessage({
+                  id: getTranslationKey('upload.progress.cancel'),
+                  defaultMessage: 'Cancel',
+                })}
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog.Portal>
     </Dialog.Root>

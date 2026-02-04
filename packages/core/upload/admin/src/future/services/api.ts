@@ -1,6 +1,6 @@
 import { adminApi } from '@strapi/admin/strapi-admin';
 
-import { updateProgress } from '../store/uploadProgress';
+import { updateProgress, addUploadErrors } from '../store/uploadProgress';
 
 import type { CreateFile } from '../../../../shared/contracts/files';
 
@@ -44,8 +44,39 @@ const uploadApi = adminApi
                 }
               } else {
                 try {
-                  const error = JSON.parse(xhr.responseText);
-                  reject({ error: { status: xhr.status, data: error } });
+                  const errorResponse = JSON.parse(xhr.responseText);
+
+                  // Dispatch error to store immediately since RTK Query strips complex error objects
+                  const fileErrors = [];
+
+                  // Check for batch validation errors (multiple files)
+                  if (
+                    errorResponse.error?.details?.errors &&
+                    Array.isArray(errorResponse.error.details.errors)
+                  ) {
+                    // Batch upload with multiple errors
+                    for (const err of errorResponse.error.details.errors) {
+                      if (err.name && err.message) {
+                        fileErrors.push({
+                          name: err.name,
+                          message: err.message,
+                        });
+                      }
+                    }
+                  }
+                  // Check for single file error
+                  else if (errorResponse.error?.details?.fileName && errorResponse.error?.message) {
+                    fileErrors.push({
+                      name: errorResponse.error.details.fileName,
+                      message: errorResponse.error.message,
+                    });
+                  }
+
+                  if (fileErrors.length > 0) {
+                    dispatch(addUploadErrors(fileErrors));
+                  }
+
+                  reject({ error: { status: xhr.status, data: errorResponse } });
                 } catch {
                   reject({
                     error: { status: xhr.status, error: `Upload failed with status ${xhr.status}` },
