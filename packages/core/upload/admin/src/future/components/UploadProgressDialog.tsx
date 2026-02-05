@@ -20,7 +20,7 @@ import { getTranslationKey } from '../utils/translations';
  * DialogHeader
  * -----------------------------------------------------------------------------------------------*/
 
-const StyleDialogHeader = styled(Flex)`
+const StyledDialogHeader = styled(Flex)`
   padding: ${({ theme }) => `${theme.spaces[2]} ${theme.spaces[4]}`};
   justify-content: space-between;
   align-items: center;
@@ -42,14 +42,14 @@ const DialogHeader = () => {
   };
 
   return (
-    <StyleDialogHeader>
+    <StyledDialogHeader>
       <Flex gap={2}>
         <Upload />
         <Typography variant="omega" fontWeight="semiBold">
           {formatMessage(
             {
               id: getTranslationKey('upload.progress.uploading-files'),
-              defaultMessage: 'Uploading {count} files',
+              defaultMessage: 'Uploading {count, plural, one {# file} other {# files}}',
             },
             { count: totalFiles }
           )}
@@ -79,7 +79,7 @@ const DialogHeader = () => {
           <Cross />
         </IconButton>
       </Flex>
-    </StyleDialogHeader>
+    </StyledDialogHeader>
   );
 };
 
@@ -165,7 +165,12 @@ export const UploadProgressDialog = () => {
   return (
     <Dialog.Root open={isOpen} modal={false}>
       <Dialog.Portal>
-        <DialogContent>
+        <DialogContent
+          aria-label={formatMessage({
+            id: getTranslationKey('upload.progress'),
+            defaultMessage: 'Upload progress',
+          })}
+        >
           {/* Header */}
           <DialogHeader />
 
@@ -175,7 +180,23 @@ export const UploadProgressDialog = () => {
               <Flex direction="column" alignItems="stretch" gap={2}>
                 <Flex gap={2} alignItems="center" justifyContent="space-between">
                   <Flex gap={2} alignItems="center">
-                    {isComplete ? <CheckCircle fill="success600" /> : <Upload fill="neutral500" />}
+                    {isComplete ? (
+                      <CheckCircle
+                        fill="success600"
+                        aria-label={formatMessage({
+                          id: getTranslationKey('upload.progress.indicator.complete'),
+                          defaultMessage: 'Upload complete indicator',
+                        })}
+                      />
+                    ) : (
+                      <Upload
+                        fill="neutral500"
+                        aria-label={formatMessage({
+                          id: getTranslationKey('upload.progress.indicator.in-progress'),
+                          defaultMessage: 'Upload in progress indicator',
+                        })}
+                      />
+                    )}
 
                     <Typography variant="pi">
                       {formatMessage({

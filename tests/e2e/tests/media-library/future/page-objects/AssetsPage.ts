@@ -1,4 +1,5 @@
 import type { Page, Locator } from '@playwright/test';
+import { expect } from '@playwright/test';
 
 /**
  * Page Object Model for the Assets Page (Future version)
@@ -8,12 +9,14 @@ export class AssetsPage {
   readonly newButton: Locator;
   readonly importFilesMenuItem: Locator;
   readonly fileInput: Locator;
+  readonly uploadProgressDialog: Locator;
 
   constructor(page: Page) {
     this.page = page;
     this.newButton = page.getByRole('button', { name: 'New' });
     this.importFilesMenuItem = page.getByRole('menuitem', { name: 'Import files' });
     this.fileInput = page.locator('input[type="file"]');
+    this.uploadProgressDialog = page.getByRole('dialog', { name: 'Upload Progress' });
   }
 
   /**
@@ -28,6 +31,10 @@ export class AssetsPage {
    */
   async openNewMenu() {
     await this.newButton.click();
+  }
+
+  async switchToTableView() {
+    await this.page.getByRole('radio', { name: 'Table view' }).click();
   }
 
   /**
@@ -53,6 +60,68 @@ export class AssetsPage {
     await fileChooser.setFiles(paths);
 
     return fileChooser;
+  }
+
+  /**
+   * Get the Upload Progress dialog
+   */
+  getUploadProgressDialog() {
+    return this.uploadProgressDialog;
+  }
+
+  /**
+   * Get the Upload Progress progressbar
+   */
+  getUploadProgressDialogProgressBar() {
+    return this.uploadProgressDialog.getByRole('progressbar').first();
+  }
+
+  getUploadProgressDialogUploadingIcon() {
+    return this.uploadProgressDialog.getByLabel('Upload in progress indicator').first();
+  }
+
+  getUploadProgressDialogCompleteIcon() {
+    return this.uploadProgressDialog.getByLabel('Upload complete indicator').first();
+  }
+
+  /**
+   * Wait for upload progress dialog to open
+   */
+  async waitForUploadProgressDialogToOpen() {
+    await this.uploadProgressDialog.waitFor({ state: 'visible' });
+  }
+
+  /**
+   * Wait for upload progress dialog to complete and optionally close it
+   */
+  async waitForUploadProgressDialogToComplete({ close = true }: { close?: boolean } = {}) {
+    await this.waitForUploadProgressDialogToOpen();
+
+    const progressBar = this.getUploadProgressDialogProgressBar();
+    await progressBar.waitFor({ state: 'visible' });
+
+    const completeIcon = this.getUploadProgressDialogCompleteIcon();
+    await completeIcon.waitFor({ state: 'visible' });
+
+    const uploadingIcon = this.getUploadProgressDialogUploadingIcon();
+    await uploadingIcon.waitFor({ state: 'hidden' });
+
+    const cancelButton = this.uploadProgressDialog.getByRole('button', { name: 'Cancel' });
+    await cancelButton.waitFor({ state: 'hidden' });
+
+    if (close) {
+      const closeButton = this.uploadProgressDialog.getByRole('button', { name: 'Close' });
+      if (await closeButton.isVisible()) {
+        await closeButton.click();
+      }
+    }
+  }
+
+  /**
+   * Upload failures are displayed in the dialog under "Failed to upload:".
+   */
+  getUploadProgressDialogFailureSection() {
+    return this.uploadProgressDialog.getByText('Failed to upload:');
   }
 
   /**
