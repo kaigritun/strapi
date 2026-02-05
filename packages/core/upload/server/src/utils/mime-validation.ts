@@ -313,13 +313,6 @@ export async function prepareUploadRequest(
 ): Promise<PrepareUploadResult> {
   const securityResults = await enforceUploadSecurity(filesInput, strapi);
 
-  if (securityResults.validFiles.length === 0) {
-    throw new errors.ValidationError(
-      securityResults.errors[0].error.message,
-      securityResults.errors[0].error.details
-    );
-  }
-
   let filteredBody = body;
   if (body?.fileInfo) {
     // Parse JSON strings in fileInfo

@@ -115,7 +115,14 @@ export default {
       return ctx.forbidden();
     }
 
-    const { validFiles, filteredBody } = await prepareUploadRequest(files, body, strapi);
+    const {
+      validFiles,
+      filteredBody,
+      errors: validationErrors,
+    } = await prepareUploadRequest(files, body, strapi);
+    if (validFiles.length === 0) {
+      throw new errors.ValidationError(validationErrors[0].message);
+    }
 
     const isMultipleFiles = validFiles.length > 1;
     const data = await validateUploadBody(filteredBody, isMultipleFiles);
