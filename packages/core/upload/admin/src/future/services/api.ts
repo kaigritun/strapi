@@ -1,11 +1,12 @@
 import { adminApi } from '@strapi/admin/strapi-admin';
 
-import { updateProgress, addUploadErrors } from '../store/uploadProgress';
+import { openUploadProgress, updateProgress, addUploadErrors } from '../store/uploadProgress';
 
 import type { CreateFilesBatch } from '../../../../shared/contracts/files';
 
 interface UploadFilesArgs {
   formData: FormData;
+  totalFiles: number;
 }
 
 interface RootState {
@@ -25,11 +26,17 @@ const uploadApi = adminApi
        * Returns { data: File[], errors?: FileUploadError[] }
        */
       uploadFilesBatch: builder.mutation<CreateFilesBatch.Response, UploadFilesArgs>({
-        queryFn: async ({ formData }, { signal, dispatch, getState }) => {
+        queryFn: async ({ formData, totalFiles }, { signal, dispatch, getState }) => {
           const token = (getState() as RootState).admin_app?.token;
+
+          dispatch(openUploadProgress({ totalFiles }));
 
           return new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
+
+            // Explicitly reset progress to 0 before attaching listeners
+            // This ensures the UI shows 0% even if the first progress event fires immediately
+            dispatch(updateProgress(0));
 
             xhr.upload.addEventListener('progress', (event) => {
               if (event.lengthComputable) {

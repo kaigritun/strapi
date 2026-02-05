@@ -4,6 +4,7 @@
   "upload.generic-error": "An error occurred while uploading the file.",
   "upload.progress.uploading-files": "Uploading {count} files",
   "upload.progress.label": "Upload",
+  "upload.progress.errors.title": "Failed to upload:",
   "upload.progress.cancel": "Cancel upload",
   "upload.progress.maximize": "Maximize",
   "upload.progress.minimize": "Minimize",

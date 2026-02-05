@@ -139,14 +139,14 @@ export const UploadProgressDialog = () => {
   const { formatMessage } = useIntl();
 
   const dispatch = useTypedDispatch();
-  const { isOpen, isMinimized, progress, errors } = useTypedSelector(
+  const { isOpen, isMinimized, progress, errors, uploadId } = useTypedSelector(
     (state) => state.uploadProgress
   );
 
   const hasErrors = errors.length > 0;
   const isComplete = progress === 100;
 
-  const handleClose = () => {
+  const handleCancel = () => {
     dispatch(closeUploadProgress());
   };
 
@@ -205,7 +205,7 @@ export const UploadProgressDialog = () => {
                   )}
                 </Flex>
 
-                <DialogProgressBar value={progress} />
+                <DialogProgressBar key={uploadId} value={progress} />
               </Flex>
 
               {hasErrors && (
@@ -237,7 +237,7 @@ export const UploadProgressDialog = () => {
           {/* Footer */}
           {!isComplete && (
             <DialogFooter>
-              <Button onClick={handleClose} variant="danger-light">
+              <Button onClick={handleCancel} variant="danger-light">
                 {formatMessage({
                   id: getTranslationKey('upload.progress.cancel'),
                   defaultMessage: 'Cancel',

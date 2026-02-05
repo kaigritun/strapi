@@ -18,8 +18,6 @@ import { styled } from 'styled-components';
 import { usePersistentState } from '../../../hooks/usePersistentState';
 import { useUploadFilesBatchMutation } from '../../services/api';
 import { useGetAssetsQuery } from '../../services/assets';
-import { useTypedDispatch } from '../../store/hooks';
-import { openUploadProgress } from '../../store/uploadProgress';
 import { getTranslationKey } from '../../utils/translations';
 
 import { AssetsGrid } from './components/AssetsGrid';
@@ -110,7 +108,6 @@ export const AssetsPage = () => {
   const { formatMessage } = useIntl();
 
   // Upload hooks
-  const dispatch = useTypedDispatch();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadFilesBatch] = useUploadFilesBatchMutation();
 
@@ -127,9 +124,6 @@ export const AssetsPage = () => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const filesArray = Array.from(files);
-
-      // Open the upload progress dialog with file count
-      dispatch(openUploadProgress({ totalFiles: filesArray.length }));
 
       // Build single FormData with all files
       const formData = new FormData();
@@ -154,7 +148,7 @@ export const AssetsPage = () => {
       try {
         // Single request for all files
         // Errors are dispatched to store from the API queryFn
-        await uploadFilesBatch({ formData }).unwrap();
+        await uploadFilesBatch({ formData, totalFiles: filesArray.length }).unwrap();
       } catch {
         // Error is already dispatched to store from the API queryFn
       }

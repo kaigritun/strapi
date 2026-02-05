@@ -11,6 +11,7 @@ export interface UploadProgressState {
   progress: number;
   totalFiles: number;
   errors: FileUploadError[];
+  uploadId: number;
 }
 
 export interface RootState {
@@ -23,6 +24,7 @@ const initialState: UploadProgressState = {
   progress: 0,
   totalFiles: 0,
   errors: [],
+  uploadId: 0,
 };
 
 const uploadProgressSlice = createSlice({
@@ -35,6 +37,7 @@ const uploadProgressSlice = createSlice({
       state.progress = 0;
       state.totalFiles = action.payload.totalFiles;
       state.errors = [];
+      state.uploadId += 1;
     },
     updateProgress(state, action: PayloadAction<number>) {
       // With single batch request, progress is directly from xhr.upload.onprogress (0-100)
