@@ -43,8 +43,8 @@ export const routes = {
     },
     {
       method: 'POST',
-      path: '/batch',
-      handler: 'admin-upload.uploadFilesBatch',
+      path: '/unstable/batch',
+      handler: 'admin-upload.unstable_uploadFilesBatch',
       config: {
         policies: ['admin::isAuthenticatedAdmin'],
       },

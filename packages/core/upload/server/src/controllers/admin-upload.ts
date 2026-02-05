@@ -98,14 +98,7 @@ export default {
     ctx.body = await pm.sanitizeOutput(signedFile, { action: ACTIONS.read });
   },
 
-  /**
-   * @deprecated Use uploadFilesBatch instead. This endpoint will be removed in a future version.
-   */
   async uploadFiles(ctx: Context) {
-    strapi.log.warn(
-      'POST /upload is deprecated for multi-file uploads. Use POST /upload/batch instead.'
-    );
-
     const {
       state: { userAbility, user },
       request: { body, files: { files } = {} },
@@ -173,10 +166,13 @@ export default {
   },
 
   /**
-   * Batch upload files with proper { data, errors } response shape.
-   * Implements per-file partial success - each file is uploaded individually.
+   * @experimental
+   * Batch upload files with partial success and error collection
+   *
+   * TODO:
+   * When this becomes stable, deprecate uploadFiles and mark it to be removed in v6
    */
-  async uploadFilesBatch(ctx: Context) {
+  async unstable_uploadFilesBatch(ctx: Context) {
     const {
       state: { userAbility, user },
       request: { body, files: { files } = {} },

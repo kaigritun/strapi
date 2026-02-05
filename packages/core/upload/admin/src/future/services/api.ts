@@ -84,7 +84,7 @@ const uploadApi = adminApi
             }
 
             const backendURL = window.strapi.backendURL;
-            xhr.open('POST', `${backendURL}/upload/batch`);
+            xhr.open('POST', `${backendURL}/upload/unstable/batch`);
 
             if (token) {
               xhr.setRequestHeader('Authorization', `Bearer ${token}`);

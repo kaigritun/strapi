@@ -176,20 +176,19 @@ export const UploadProgressDialog = () => {
                 <Flex gap={2} alignItems="center" justifyContent="space-between">
                   <Flex gap={2} alignItems="center">
                     {isComplete ? <CheckCircle fill="success600" /> : <Upload fill="neutral500" />}
-                    <Flex>
-                      <Typography variant="pi">
-                        {formatMessage({
-                          id: getTranslationKey('upload.progress.label'),
-                          defaultMessage: 'Upload',
-                        })}
-                      </Typography>
-                      {!isComplete && (
-                        <Typography variant="pi" textColor="netural600">
-                          {progress}%
-                        </Typography>
-                      )}
-                    </Flex>
+
+                    <Typography variant="pi">
+                      {formatMessage({
+                        id: getTranslationKey('upload.progress.label'),
+                        defaultMessage: 'Upload',
+                      })}
+                    </Typography>
                   </Flex>
+                  {!isComplete && (
+                    <Typography variant="pi" textColor="netural600">
+                      {progress}%
+                    </Typography>
+                  )}
                   {hasErrors && (
                     <Badge
                       backgroundColor="warning100"

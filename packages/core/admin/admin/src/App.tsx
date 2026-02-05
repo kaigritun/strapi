@@ -45,9 +45,8 @@ const App = ({ strapi, store }: AppProps) => {
     <Providers strapi={strapi} store={store}>
       <Suspense fallback={<Page.Loading />}>
         <GlobalNotifications />
-        {globalComponents.map(({ name, Component }) => (
-          <Component key={name} />
-        ))}
+        {window.strapi.future.isEnabled('unstableMediaLibrary') &&
+          globalComponents.map(({ name, Component }) => <Component key={name} />)}
         <Outlet />
       </Suspense>
     </Providers>

@@ -229,7 +229,7 @@ export declare namespace CreateFile {
 }
 
 /**
- * POST /upload/batch - Batch upload files with partial success support
+ * POST /upload/unstable/batch - Batch upload files with partial success support
  */
 export declare namespace CreateFilesBatch {
   export interface FileUploadError {
